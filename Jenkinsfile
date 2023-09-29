@@ -1,55 +1,48 @@
 pipeline {
+    agent any
+    
     parameters {
-        choice(name: 'ENVIRONMENT', choices: "dev\nstage\nprod", description: 'Select the environment for deployment')
+        choice(name: 'ENVIRONMENT', choices: 'dev\nstage\nprod', description: 'Select target environment')
     }
 
-    agent any
-
     stages {
-        stage('Git SCM') {
+        stage('Gitscm') {
             steps {
+                // Checkout your Git repository here
                 git 'https://github.com/AnbazhaganSekar/Mpower_softtech_solutions_42.git'
             }
         }
 
-        stage('Docker Build') {
+        stage('Build and Deploy') {
+            when {
+                expression { currentBuild.resultIsBetterOrEqualTo('SUCCESS') }
+            }
             matrix {
                 axes {
                     axis {
-                        name: 'ENVIRONMENT'
-                        values: 'dev', 'stage', 'prod'
+                        name 'ENVIRONMENT'
+                        values 'dev', 'stage', 'prod'
                     }
                 }
                 stages {
-                    stage("Build ${ENVIRONMENT}") {
-                        when {
-                            expression {
-                                return ENVIRONMENT == 'dev' || ENVIRONMENT == 'stage' || ENVIRONMENT == 'prod'
-                            }
-                        }
+                    stage('Docker Build') {
                         steps {
                             script {
-                                def imageTag = "${ENVIRONMENT}-myapp:${BUILD_NUMBER}"
-                                sh "docker build -t ${imageTag} ."
-                                sh "docker push ${imageTag}"
+                                def dockerImageName = "myapp:${params.ENVIRONMENT}"
+                                // Build Docker image for the specified environment
+                                sh "docker build -t $dockerImageName ."
                             }
                         }
                     }
-                }
-            }
-        }
-
-        stage('Deployment') {
-            when {
-                expression {
-                    return ENVIRONMENT == 'dev' || ENVIRONMENT == 'stage' || ENVIRONMENT == 'prod'
-                }
-            }
-            steps {
-                script {
-                    def imageTag = "${ENVIRONMENT}-myapp:${BUILD_NUMBER}"
-                    // Deploy the Docker container to the selected environment
-                    // Add deployment steps for each environment here
+                    stage('Deployment') {
+                        steps {
+                            script {
+                                // Simulate deployment by echoing a message
+                                echo "Deploying to ${params.ENVIRONMENT} environment..."
+                                // You can add deployment steps specific to your environment here
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -57,19 +50,18 @@ pipeline {
 
     post {
         failure {
-            emailext (
-                subject: "Pipeline Failed: ${currentBuild.fullDisplayName}",
-                body: "The Jenkins pipeline ${currentBuild.fullDisplayName} has failed. Please investigate and take appropriate action.",
-                to: "anbuprofessional1996@gmail.com",
-                attachLog: true
-            )
+            // Send email notification on pipeline failure
+            emailext subject: "Pipeline Failed: ${currentBuild.fullDisplayName}",
+                      body: "The pipeline failed for environment: ${params.ENVIRONMENT}. Please investigate.",
+                      to: 'anbuprofessional1996@gmail.com',
+                      mimeType: 'text/plain'
         }
         success {
-            emailext (
-                subject: "Pipeline Successful: ${currentBuild.fullDisplayName}",
-                body: "The Jenkins pipeline ${currentBuild.fullDisplayName} has successfully completed.",
-                to: "anbuprofessional1996@gmail.com"
-            )
+            // Send email notification on pipeline success
+            emailext subject: "Pipeline Succeeded: ${currentBuild.fullDisplayName}",
+                      body: "The pipeline succeeded for environment: ${params.ENVIRONMENT}.",
+                      to: 'anbuprofessional1996@gmail.com',
+                      mimeType: 'text/plain'
         }
     }
 }
